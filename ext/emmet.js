@@ -624,11 +624,11 @@ var TabstopManager = function(editor) {
         this.editor = null;
     };
 
-    this.onChange = function(e) {
-        var changeRange = e.data.range;
-        var isRemove = e.data.action[0] == "r";
-        var start = changeRange.start;
-        var end = changeRange.end;
+    this.onChange = function(delta) {
+        var changeRange = delta;
+        var isRemove = delta.action[0] == "r";
+        var start = delta.start;
+        var end = delta.end;
         var startRow = start.row;
         var endRow = end.row;
         var lineDif = endRow - startRow;
@@ -1106,18 +1106,18 @@ exports.runEmmetCommand = function(editor) {
             if (!editor.selection.isEmpty())
                 return false;
         }
-
+        
         if (this.action == "wrap_with_abbreviation") {
             return setTimeout(function() {
                 actions.run("wrap_with_abbreviation", editorProxy);
             }, 0);
         }
-
+        
         var pos = editor.selection.lead;
         var token = editor.session.getTokenAt(pos.row, pos.column);
         if (token && /\btag\b/.test(token.type))
             return false;
-
+        
         var result = actions.run(this.action, editorProxy);
     } catch(e) {
         editor._signal("changeStatus", typeof e == "string" ? e : e.message);
@@ -1146,7 +1146,7 @@ exports.updateCommands = function(editor, enabled) {
 };
 
 exports.isSupportedMode = function(modeId) {
-    return modeId && /css|less|scss|sass|stylus|html|php|twig|ejs/.test(modeId);
+    return modeId && /css|less|scss|sass|stylus|html|php|twig|ejs|handlebars/.test(modeId);
 };
 
 var onChangeMode = function(e, target) {

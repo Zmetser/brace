@@ -416,15 +416,15 @@ var CstyleBehaviour = function() {
                 var line = session.doc.getLine(cursor.row);
                 var leftChar = line.substring(cursor.column-1, cursor.column);
                 var rightChar = line.substring(cursor.column, cursor.column + 1);
-
+                
                 var token = session.getTokenAt(cursor.row, cursor.column);
                 var rightToken = session.getTokenAt(cursor.row, cursor.column + 1);
                 if (leftChar == "\\" && token && /escape/.test(token.type))
                     return null;
-
-                var stringBefore = token && /string/.test(token.type);
-                var stringAfter = !rightToken || /string/.test(rightToken.type);
-
+                
+                var stringBefore = token && /string|escape/.test(token.type);
+                var stringAfter = !rightToken || /string|escape/.test(rightToken.type);
+                
                 var pair;
                 if (rightChar == quote) {
                     pair = stringBefore !== stringAfter;
@@ -638,35 +638,35 @@ var FoldMode = exports.FoldMode = function(commentRegex) {
 oop.inherits(FoldMode, BaseFoldMode);
 
 (function() {
-
+    
     this.foldingStartMarker = /(\{|\[)[^\}\]]*$|^\s*(\/\*)/;
     this.foldingStopMarker = /^[^\[\{]*(\}|\])|^[\s\*]*(\*\/)/;
     this.singleLineBlockCommentRe= /^\s*(\/\*).*\*\/\s*$/;
     this.tripleStarBlockCommentRe = /^\s*(\/\*\*\*).*\*\/\s*$/;
-    this.startRegionRe = /^\s*(\/\*|\/\/)#region\b/;
+    this.startRegionRe = /^\s*(\/\*|\/\/)#?region\b/;
     this._getFoldWidgetBase = this.getFoldWidget;
     this.getFoldWidget = function(session, foldStyle, row) {
         var line = session.getLine(row);
-
+    
         if (this.singleLineBlockCommentRe.test(line)) {
             if (!this.startRegionRe.test(line) && !this.tripleStarBlockCommentRe.test(line))
                 return "";
         }
-
+    
         var fw = this._getFoldWidgetBase(session, foldStyle, row);
-
+    
         if (!fw && this.startRegionRe.test(line))
             return "start"; // lineCommentRegionStart
-
+    
         return fw;
     };
 
     this.getFoldWidgetRange = function(session, foldStyle, row, forceMultiline) {
         var line = session.getLine(row);
-
+        
         if (this.startRegionRe.test(line))
             return this.getCommentRegionBlock(session, line, row);
-
+        
         var match = line.match(this.foldingStartMarker);
         if (match) {
             var i = match.index;
@@ -731,13 +731,12 @@ oop.inherits(FoldMode, BaseFoldMode);
         
         return new Range(startRow, startColumn, endRow, session.getLine(endRow).length);
     };
-
     this.getCommentRegionBlock = function(session, line, row) {
         var startColumn = line.search(/\s*$/);
         var maxRow = session.getLength();
         var startRow = row;
-
-        var re = /^\s*(?:\/\*|\/\/)#(end)?region\b/;
+        
+        var re = /^\s*(?:\/\*|\/\/|--)#?(end)?region\b/;
         var depth = 1;
         while (++row < maxRow) {
             line = session.getLine(row);
@@ -807,7 +806,7 @@ oop.inherits(Mode, TextMode);
     };
 
     this.createWorker = function(session) {
-        var worker = new WorkerClient(["ace"], require("../worker/css"), "Worker");
+        var worker = new WorkerClient(["ace"], "ace/mode/css_worker", "Worker");
         worker.attachToDocument(session.getDocument());
 
         worker.on("annotate", function(e) {

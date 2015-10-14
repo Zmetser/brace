@@ -9,7 +9,7 @@ var DocCommentHighlightRules = function() {
         "start" : [ {
             token : "comment.doc.tag",
             regex : "@[\\w\\d_]+" // TODO: fix email addresses
-        },
+        }, 
         DocCommentHighlightRules.getTagRule(),
         {
             defaultToken : "comment.doc",
@@ -551,8 +551,7 @@ var oop = acequire("../lib/oop");
 var TextHighlightRules = acequire("./text_highlight_rules").TextHighlightRules;
 
 var XmlHighlightRules = function(normalize) {
-
-    var tagRegex = "[a-zA-Z][-_a-zA-Z0-9]*";
+    var tagRegex = "[_:a-zA-Z\xc0-\uffff][-_:.a-zA-Z0-9\xc0-\uffff]*";
 
     this.$rules = {
         start : [
@@ -794,7 +793,7 @@ var HtmlHighlightRules = function() {
             include : "tag_whitespace"
         }, {
             token : "entity.other.attribute-name.xml",
-            regex : "[-_a-zA-Z0-9:]+"
+            regex : "[-_a-zA-Z0-9:.]+"
         }, {
             token : "keyword.operator.attribute-equals.xml",
             regex : "=",
@@ -818,7 +817,7 @@ var HtmlHighlightRules = function() {
                 return ["meta.tag.punctuation." + (start == "<" ? "" : "end-") + "tag-open.xml",
                     "meta.tag" + (group ? "." + group : "") + ".tag-name.xml"];
             },
-            regex : "(</?)([-_a-zA-Z0-9:]+)",
+            regex : "(</?)([-_a-zA-Z0-9:.]+)",
             next: "tag_stuff"
         }],
         tag_stuff: [
@@ -2158,15 +2157,15 @@ var CstyleBehaviour = function() {
                 var line = session.doc.getLine(cursor.row);
                 var leftChar = line.substring(cursor.column-1, cursor.column);
                 var rightChar = line.substring(cursor.column, cursor.column + 1);
-
+                
                 var token = session.getTokenAt(cursor.row, cursor.column);
                 var rightToken = session.getTokenAt(cursor.row, cursor.column + 1);
                 if (leftChar == "\\" && token && /escape/.test(token.type))
                     return null;
-
-                var stringBefore = token && /string/.test(token.type);
-                var stringAfter = !rightToken || /string/.test(rightToken.type);
-
+                
+                var stringBefore = token && /string|escape/.test(token.type);
+                var stringAfter = !rightToken || /string|escape/.test(rightToken.type);
+                
                 var pair;
                 if (rightChar == quote) {
                     pair = stringBefore !== stringAfter;
@@ -2301,35 +2300,35 @@ var FoldMode = exports.FoldMode = function(commentRegex) {
 oop.inherits(FoldMode, BaseFoldMode);
 
 (function() {
-
+    
     this.foldingStartMarker = /(\{|\[)[^\}\]]*$|^\s*(\/\*)/;
     this.foldingStopMarker = /^[^\[\{]*(\}|\])|^[\s\*]*(\*\/)/;
     this.singleLineBlockCommentRe= /^\s*(\/\*).*\*\/\s*$/;
     this.tripleStarBlockCommentRe = /^\s*(\/\*\*\*).*\*\/\s*$/;
-    this.startRegionRe = /^\s*(\/\*|\/\/)#region\b/;
+    this.startRegionRe = /^\s*(\/\*|\/\/)#?region\b/;
     this._getFoldWidgetBase = this.getFoldWidget;
     this.getFoldWidget = function(session, foldStyle, row) {
         var line = session.getLine(row);
-
+    
         if (this.singleLineBlockCommentRe.test(line)) {
             if (!this.startRegionRe.test(line) && !this.tripleStarBlockCommentRe.test(line))
                 return "";
         }
-
+    
         var fw = this._getFoldWidgetBase(session, foldStyle, row);
-
+    
         if (!fw && this.startRegionRe.test(line))
             return "start"; // lineCommentRegionStart
-
+    
         return fw;
     };
 
     this.getFoldWidgetRange = function(session, foldStyle, row, forceMultiline) {
         var line = session.getLine(row);
-
+        
         if (this.startRegionRe.test(line))
             return this.getCommentRegionBlock(session, line, row);
-
+        
         var match = line.match(this.foldingStartMarker);
         if (match) {
             var i = match.index;
@@ -2394,13 +2393,12 @@ oop.inherits(FoldMode, BaseFoldMode);
         
         return new Range(startRow, startColumn, endRow, session.getLine(endRow).length);
     };
-
     this.getCommentRegionBlock = function(session, line, row) {
         var startColumn = line.search(/\s*$/);
         var maxRow = session.getLength();
         var startRow = row;
-
-        var re = /^\s*(?:\/\*|\/\/)#(end)?region\b/;
+        
+        var re = /^\s*(?:\/\*|\/\/|--)#?(end)?region\b/;
         var depth = 1;
         while (++row < maxRow) {
             line = session.getLine(row);
@@ -2436,7 +2434,7 @@ var CStyleFoldMode = acequire("./folding/cstyle").FoldMode;
 
 var Mode = function() {
     this.HighlightRules = JavaScriptHighlightRules;
-
+    
     this.$outdent = new MatchingBraceOutdent();
     this.$behaviour = new CstyleBehaviour();
     this.foldingRules = new CStyleFoldMode();
@@ -2489,7 +2487,7 @@ oop.inherits(Mode, TextMode);
     };
 
     this.createWorker = function(session) {
-        var worker = new WorkerClient(["ace"], require("../worker/javascript"), "JavaScriptWorker");
+        var worker = new WorkerClient(["ace"], "ace/mode/javascript_worker", "JavaScriptWorker");
         worker.attachToDocument(session.getDocument());
 
         worker.on("annotate", function(results) {
@@ -2636,7 +2634,7 @@ oop.inherits(Mode, TextMode);
     };
 
     this.createWorker = function(session) {
-        var worker = new WorkerClient(["ace"], require("../worker/css"), "Worker");
+        var worker = new WorkerClient(["ace"], "ace/mode/css_worker", "Worker");
         worker.attachToDocument(session.getDocument());
 
         worker.on("annotate", function(e) {
@@ -2836,7 +2834,7 @@ oop.inherits(FoldMode, BaseFoldMode);
 
 
     this.$getMode = function(state) {
-        if (typeof state != "string")
+        if (typeof state != "string") 
             state = state[0];
         for (var key in this.subModes) {
             if (state.indexOf(key) === 0)
@@ -2844,7 +2842,7 @@ oop.inherits(FoldMode, BaseFoldMode);
         }
         return null;
     };
-
+    
     this.$tryMode = function(state, session, foldStyle, row) {
         var mode = this.$getMode(state);
         return (mode ? mode.getFoldWidget(session, foldStyle, row) : "");
@@ -2860,13 +2858,13 @@ oop.inherits(FoldMode, BaseFoldMode);
 
     this.getFoldWidgetRange = function(session, foldStyle, row) {
         var mode = this.$getMode(session.getState(row-1));
-
+        
         if (!mode || !mode.getFoldWidget(session, foldStyle, row))
             mode = this.$getMode(session.getState(row));
-
+        
         if (!mode || !mode.getFoldWidget(session, foldStyle, row))
             mode = this.defaultMode;
-
+        
         return mode.getFoldWidgetRange(session, foldStyle, row);
     };
 
@@ -2889,7 +2887,7 @@ var FoldMode = exports.FoldMode = function(voidElements, optionalEndTags) {
     this.optionalEndTags = oop.mixin({}, this.voidElements);
     if (optionalEndTags)
         oop.mixin(this.optionalEndTags, optionalEndTags);
-
+    
 };
 oop.inherits(FoldMode, BaseFoldMode);
 
@@ -2997,7 +2995,7 @@ function is(token, type) {
 
         return null;
     };
-
+    
     this._readTagBackward = function(iterator) {
         var token = iterator.getCurrentToken();
         if (!token)
@@ -3022,10 +3020,10 @@ function is(token, type) {
 
         return null;
     };
-
+    
     this._pop = function(stack, tag) {
         while (stack.length) {
-
+            
             var top = stack[stack.length-1];
             if (!tag || top.tagName == tag.tagName) {
                 return stack.pop();
@@ -3038,17 +3036,17 @@ function is(token, type) {
             }
         }
     };
-
+    
     this.getFoldWidgetRange = function(session, foldStyle, row) {
         var firstTag = this._getFirstTagInLine(session, row);
-
+        
         if (!firstTag)
             return null;
-
+        
         var isBackward = firstTag.closing || firstTag.selfClosing;
         var stack = [];
         var tag;
-
+        
         if (!isBackward) {
             var iterator = new TokenIterator(session, row, firstTag.start.column);
             var start = {
@@ -3066,7 +3064,7 @@ function is(token, type) {
                     } else
                         continue;
                 }
-
+                
                 if (tag.closing) {
                     this._pop(stack, tag);
                     if (stack.length == 0)
@@ -3083,7 +3081,7 @@ function is(token, type) {
                 row: row,
                 column: firstTag.start.column
             };
-
+            
             while (tag = this._readTagBackward(iterator)) {
                 if (tag.selfClosing) {
                     if (!stack.length) {
@@ -3093,7 +3091,7 @@ function is(token, type) {
                     } else
                         continue;
                 }
-
+                
                 if (!tag.closing) {
                     this._pop(stack, tag);
                     if (stack.length == 0) {
@@ -3108,7 +3106,7 @@ function is(token, type) {
                 }
             }
         }
-
+        
     };
 
 }).call(FoldMode.prototype);
@@ -3427,12 +3425,12 @@ var Mode = function(options) {
     this.HighlightRules = HtmlHighlightRules;
     this.$behaviour = new XmlBehaviour();
     this.$completer = new HtmlCompletions();
-
+    
     this.createModeDelegates({
         "js-": JavaScriptMode,
         "css-": CssMode
     });
-
+    
     this.foldingRules = new HtmlFoldMode(this.voidElements, lang.arrayToMap(optionalEndTags));
 };
 oop.inherits(Mode, TextMode);
@@ -3458,7 +3456,7 @@ oop.inherits(Mode, TextMode);
     this.createWorker = function(session) {
         if (this.constructor != Mode)
             return;
-        var worker = new WorkerClient(["ace"], require("../worker/html"), "Worker");
+        var worker = new WorkerClient(["ace"], "ace/mode/html_worker", "Worker");
         worker.attachToDocument(session.getDocument());
 
         if (this.fragmentContext)

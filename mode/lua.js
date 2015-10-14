@@ -342,9 +342,9 @@ oop.inherits(Mode, TextMode);
                     level += indentKeywords[token.value];
                 }
             } else if (token.type == "paren.lparen") {
-                level ++;
+                level += token.value.length;
             } else if (token.type == "paren.rparen") {
-                level --;
+                level -= token.value.length;
             }
         }
         if (level < 0) {
@@ -405,7 +405,7 @@ oop.inherits(Mode, TextMode);
     };
 
     this.createWorker = function(session) {
-        var worker = new WorkerClient(["ace"], require("../worker/lua"), "Worker");
+        var worker = new WorkerClient(["ace"], "ace/mode/lua_worker", "Worker");
         worker.attachToDocument(session.getDocument());
         
         worker.on("annotate", function(e) {
